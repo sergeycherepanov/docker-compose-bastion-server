@@ -1,0 +1,271 @@
+services:
+  # Caddy reverse proxy
+  caddy: !override
+    image: traefik:v2.11
+    command:
+      - "--ping=true"
+      - "--log.level=DEBUG"
+      - "--api=true"
+      - "--api.dashboard=true"
+      - "--accesslog=true"
+      - "--accesslog.filepath=/tmp/access.log"
+      - "--certificatesResolvers.http.acme.email=admin@${NETBIRD_DOMAIN}"
+      - "--certificatesresolvers.http.acme.storage=/traefik/acme.http.json"
+      - "--certificatesresolvers.http.acme.httpChallenge=true"
+      - "--certificatesresolvers.http.acme.httpChallenge.entryPoint=unsecure"
+      - "--experimental.plugins.rewrite-body.modulename=github.com/packruler/rewrite-body"
+      - "--experimental.plugins.rewrite-body.version=v1.2.0"
+      - "--experimental.plugins.cookiePathRewrite.modulename=github.com/vnghia/traefik-plugin-rewrite-cookie-path"
+      - "--experimental.plugins.cookiePathRewrite.version=v0.0.1"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.constraints=Label(`project.name`, `netbird`)"
+      - "--entrypoints.unsecure.address=:80"
+      - "--entrypoints.default.forwardedheaders.trustedips=0.0.0.0/0"
+      - "--entryPoints.default.forwardedHeaders.insecure"
+      - "--entrypoints.default.address=:443"
+    restart: always
+    networks:
+      netbird: null
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    ports:
+      - "${TRAEFIK_BIND_ADDRESS_HTTP:-0.0.0.0}:${TRAEFIK_BIND_PORT_HTTP:-80}:80"
+      - "${TRAEFIK_BIND_ADDRESS_HTTPS:-0.0.0.0}:${TRAEFIK_BIND_PORT_HTTP:-443}:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "netbird_caddy_data:/traefik"
+    labels:
+      project.name: 'netbird'
+      traefik.enable: 'true'
+      traefik.http.routers.traefik-api-unsecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/traefik/dashboard`) || (PathPrefix(`/api`) && HeadersRegexp(`referer`, `/traefik/dashboard`)))'
+      traefik.http.routers.traefik-api-unsecure.entrypoints: "unsecure"
+      traefik.http.routers.traefik-api-unsecure.middlewares: "redirect-secure"
+      traefik.http.routers.traefik-api-unsecure.priority: 9000
+      traefik.http.routers.traefik-api.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/traefik/dashboard`) || (PathPrefix(`/api`) && HeadersRegexp(`referer`, `/traefik/dashboard`)))'
+      traefik.http.routers.traefik-api.priority: 9000
+      traefik.http.routers.traefik-api.entrypoints: "default"
+      traefik.http.routers.traefik-api.service: "api@internal"
+      traefik.http.routers.traefik-api.middlewares: "traefik-api-stripprefix,traefik-api-auth"
+      traefik.http.routers.traefik-api.tls: "true"
+      traefik.http.routers.traefik-api.tls.certresolver: "http"
+      traefik.http.routers.traefik-api.tls.domains[0].main: "${NETBIRD_DOMAIN}"
+      traefik.http.middlewares.traefik-api-stripprefix.stripprefix.prefixes: "/traefik"
+      traefik.http.middlewares.traefik-api-auth.basicauth.users: "admin:{SHA}0tTNr469Z7oY3fDRwNoUXE2vTBw="
+      traefik.http.middlewares.redirect-secure.redirectregex.regex: "^(http|ws):\\/\\/(.+)$$"
+      traefik.http.middlewares.redirect-secure.redirectregex.replacement: "$${1}s://$${2}"
+      traefik.http.middlewares.redirect-secure.redirectregex.permanent: "true"
+    healthcheck:
+      test: traefik healthcheck --ping
+      start_period: 5s
+
+  # UI dashboard
+  dashboard:
+    depends_on:
+      caddy:
+        condition: 'service_healthy'
+    labels:
+      project.name: "netbird"
+      traefik.enable: "true"
+      traefik.http.routers.dashboard-unsecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && PathPrefix(`/`)'
+      traefik.http.routers.dashboard-unsecure.entrypoints: "unsecure"
+      traefik.http.routers.dashboard-unsecure.middlewares: "redirect-secure"
+      traefik.http.routers.dashboard-unsecure.priority: 1000
+      traefik.http.routers.dashboard.rule: 'Host(`${NETBIRD_DOMAIN}`) && PathPrefix(`/`)'
+      traefik.http.routers.dashboard.priority: 1000
+      traefik.http.routers.dashboard.entrypoints: "default"
+      traefik.http.routers.dashboard.service: "dashboard"
+      traefik.http.routers.dashboard.tls: "true"
+      traefik.http.routers.dashboard.tls.certresolver: "http"
+      traefik.http.routers.dashboard.tls.domains[0].main: "${NETBIRD_DOMAIN}"
+      traefik.http.services.dashboard.loadbalancer.server.port: "80"
+
+  # Signal
+  signal:
+    depends_on:
+      caddy:
+        condition: 'service_healthy'
+    labels:
+      project.name: "netbird"
+      traefik.enable: "true"
+      traefik.http.routers.signal-unsecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/signalexchange`))'
+      traefik.http.routers.signal-unsecure.entrypoints: "unsecure"
+      traefik.http.routers.signal-unsecure.service: "signal-unsecure"
+      traefik.http.routers.signal-unsecure.priority: 4000
+      traefik.http.routers.signal.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/signalexchange`))'
+      traefik.http.routers.signal.priority: 4000
+      traefik.http.routers.signal.entrypoints: "default"
+      traefik.http.routers.signal.service: "signal"
+      traefik.http.routers.signal.tls: "true"
+      traefik.http.routers.signal.tls.certresolver: "http"
+      traefik.http.routers.signal.tls.domains[0].main: "${NETBIRD_DOMAIN}"
+      traefik.http.services.signal-unsecure.loadbalancer.server.port: "80"
+      traefik.http.services.signal.loadbalancer.server.scheme: "h2c"
+      traefik.http.services.signal.loadbalancer.server.port: "10000"
+
+  # Relay
+  relay:
+    depends_on:
+      caddy:
+        condition: 'service_healthy'
+    labels:
+      project.name: "netbird"
+      traefik.enable: "true"
+      traefik.http.routers.relay-unsecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/relay`))'
+      traefik.http.routers.relay-unsecure.entrypoints: "unsecure"
+      traefik.http.routers.relay-unsecure.middlewares: "redirect-secure"
+      traefik.http.routers.relay-unsecure.priority: 4000
+      traefik.http.routers.relay.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/relay`))'
+      traefik.http.routers.relay.priority: 4000
+      traefik.http.routers.relay.entrypoints: "default"
+      traefik.http.routers.relay.service: "relay"
+      traefik.http.routers.relay.tls: "true"
+      traefik.http.routers.relay.tls.certresolver: "http"
+      traefik.http.routers.relay.tls.domains[0].main: "${NETBIRD_DOMAIN}"
+      traefik.http.services.relay.loadbalancer.server.port: "80"
+
+  # Management
+  management:
+    command: [
+      "--port", "80",
+      "--log-file", "console",
+      "--log-level", "info",
+      "--disable-anonymous-metrics=false",
+      "--single-account-mode-domain=netbird.selfhosted",
+      "--dns-domain=netbird.selfhosted",
+      "--idp-sign-key-refresh-enabled",
+    ]
+    depends_on:
+      caddy:
+        condition: 'service_healthy'
+    labels:
+      project.name: "netbird"
+      traefik.enable: "true"
+      traefik.http.routers.management-unsecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/management.ManagementService`) || PathPrefix(`/api/`))'
+      traefik.http.routers.management-unsecure.entrypoints: "unsecure"
+      traefik.http.routers.management-unsecure.middlewares: "redirect-secure"
+      traefik.http.routers.management-unsecure.priority: 4000
+      traefik.http.routers.management.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/management.ManagementService`) || PathPrefix(`/api/`))'
+      traefik.http.routers.management.priority: 4000
+      traefik.http.routers.management.entrypoints: "default"
+      traefik.http.routers.management.service: "management"
+      traefik.http.routers.management.tls: "true"
+      traefik.http.routers.management.tls.certresolver: "http"
+      traefik.http.routers.management.tls.domains[0].main: "${NETBIRD_DOMAIN}"
+      traefik.http.services.management.loadbalancer.server.scheme: "h2c"
+      traefik.http.services.management.loadbalancer.server.port: "80"
+      
+
+  # Zitadel - identity provider
+  zitadel:
+    depends_on:
+      caddy:
+        condition: 'service_healthy'
+    labels:
+      project.name: "netbird"
+      traefik.enable: "true"
+      traefik.http.routers.zitadel-unsecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/zitadel`) || PathPrefix(`/device`) || PathPrefix(`/{path:(ui|.well-known|openapi|debug)}/`) || PathPrefix(`/{path:(admin|auth|management|system|assets|oidc|saml|oauth)/v[0-9]+/}`))'
+      traefik.http.routers.zitadel-unsecure.entrypoints: "unsecure"
+      traefik.http.routers.zitadel-unsecure.middlewares: "redirect-secure"
+      traefik.http.routers.zitadel-unsecure.priority: 5000
+      traefik.http.routers.zitadel.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/zitadel`) || PathPrefix(`/device`) || PathPrefix(`/{path:(ui|.well-known|openapi|debug)}/`) || PathPrefix(`/{path:(admin|auth|management|system|assets|oidc|saml|oauth)/v[0-9]+/}`))'
+      traefik.http.routers.zitadel.priority: 5000
+      traefik.http.routers.zitadel.entrypoints: "default"
+      traefik.http.routers.zitadel.service: "zitadel"
+      traefik.http.routers.zitadel.tls: "true"
+      traefik.http.routers.zitadel.tls.certresolver: "http"
+      traefik.http.routers.zitadel.tls.domains[0].main: "${NETBIRD_DOMAIN}"
+      traefik.http.services.zitadel.loadbalancer.server.scheme: "h2c"
+      traefik.http.services.zitadel.loadbalancer.server.port: "8080"
+
+  mail:
+    depends_on:
+      caddy:
+        condition: 'service_healthy'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - nc -vz -w 1 localhost 8025
+      interval: 2s
+      start_period: 5s
+    image: cd2team/mailhog
+    environment:
+      MH_UI_WEB_PATH: "mail"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "2"
+    networks:
+      netbird: null
+    restart: always
+    labels:
+      project.name: "netbird"
+      traefik.enable: "true"
+      traefik.http.routers.mail-unsecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/mail/`))'
+      traefik.http.routers.mail-unsecure.entrypoints: "unsecure"
+      traefik.http.routers.mail-unsecure.middlewares: "redirect-secure"
+      traefik.http.routers.mail-unsecure.priority: 6000
+      traefik.http.routers.mail.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/mail/`))'
+      traefik.http.routers.mail.priority: 6000
+      traefik.http.routers.mail.entrypoints: "default"
+      traefik.http.routers.mail.service: "mail"
+      traefik.http.routers.mail.middlewares: "mail-auth"
+      traefik.http.routers.mail.tls: "true"
+      traefik.http.routers.mail.tls.certresolver: "http"
+      traefik.http.routers.mail.tls.domains[0].main: "${NETBIRD_DOMAIN}"
+      traefik.http.services.mail.loadbalancer.server.port: "8025"
+      traefik.http.middlewares.mail-auth.basicauth.users: "admin:{SHA}0tTNr469Z7oY3fDRwNoUXE2vTBw="
+
+  tinyproxy:
+    image: docker.io/kalaksi/tinyproxy
+    # You can also use GitLab as an alternative to Docker Hub:
+    # image: registry.gitlab.com/kalaksi-containers/tinyproxy
+    restart: always
+    cap_drop:
+      - ALL
+    ports:
+      - 8888:8888
+    # See tinyproxy.conf for better explanation of these values.
+    environment:
+      # Optionally override port tinyproxy is listening on.
+      # PORT: 8080
+      # Set to "yes" to disable the Via-header, set to empty to leave it enabled.
+      DISABLE_VIA_HEADER: 'yes'
+      # Set this to e.g. tinyproxy.stats to enable stats-page on that address
+      STAT_HOST: tinyproxy.stats
+      MAX_CLIENTS: 100
+      # A space separated list. If not set or is empty, all networks are allowed.
+      ALLOWED_NETWORKS: 127.0.0.1/8 10.0.0.0/8 
+      # One of Critical, Error, Warning, Notice, Connect, Info
+      LOG_LEVEL: Notice
+      # Maximum number of seconds idle connections are allowed to remain open
+      TIMEOUT: 900
+      # Username for BasicAuth
+      # AUTH_USER: ''
+      # Password for BasicAuth (letters and digits only)
+      # Prefer secrets-mechanisms instead of environment variables.
+      # AUTH_PASSWORD: ''
+    # secrets:
+    #   - auth_password
+    # # With Alpine base image, this is required, for some reason, or /run/secrets won't get mounted.
+    # tmpfs:
+    #   - /run
+    healthcheck:
+      test: ["CMD", "curl", "-I", "-H", "Host: tinyproxy.stats", "http://localhost:8888"]
+      interval: 5m
+      timeout: 10s
+      retries: 1
+    # volumes:
+    #   # If not using docker-compose for secrets, you can still manually mount a file containing the password.
+    #   - ./secrets/auth_password:/run/secrets/auth_password:ro
+
+  coturn:
+    volumes:
+      - netbird_coturn_data:/var/lib/coturn
+
+volumes:
+  netbird_coturn_data:

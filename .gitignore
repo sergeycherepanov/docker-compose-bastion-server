@@ -1,0 +1,10 @@
+.env
+Caddyfile
+dashboard.env
+docker-compose.yml
+machinekey
+management.json
+relay.env
+turnserver.conf
+zdb.env
+zitadel.env

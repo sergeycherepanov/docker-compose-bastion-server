@@ -134,8 +134,8 @@ services:
       "--log-file", "console",
       "--log-level", "info",
       "--disable-anonymous-metrics=false",
-      "--single-account-mode-domain=netbird.selfhosted",
-      "--dns-domain=netbird.selfhosted",
+      "--single-account-mode-domain=intra.${NETBIRD_DOMAIN}",
+      "--dns-domain=intra.${NETBIRD_DOMAIN}",
       "--idp-sign-key-refresh-enabled",
     ]
     depends_on:

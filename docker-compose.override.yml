@@ -34,7 +34,7 @@ services:
         max-file: "3"
     ports:
       - "${TRAEFIK_BIND_ADDRESS_HTTP:-0.0.0.0}:${TRAEFIK_BIND_PORT_HTTP:-80}:80"
-      - "${TRAEFIK_BIND_ADDRESS_HTTPS:-0.0.0.0}:${TRAEFIK_BIND_PORT_HTTP:-443}:443"
+      - "${TRAEFIK_BIND_ADDRESS_HTTPS:-0.0.0.0}:${TRAEFIK_BIND_PORT_HTTPS:-443}:443"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "netbird_caddy_data:/traefik"

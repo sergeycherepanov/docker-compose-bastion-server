@@ -12,7 +12,7 @@ services:
       - "--certificatesResolvers.http.acme.email=admin@${NETBIRD_DOMAIN}"
       - "--certificatesresolvers.http.acme.storage=/traefik/acme.http.json"
       - "--certificatesresolvers.http.acme.httpChallenge=true"
-      - "--certificatesresolvers.http.acme.httpChallenge.entryPoint=unsecure"
+      - "--certificatesresolvers.http.acme.httpChallenge.entryPoint=web"
       - "--experimental.plugins.rewrite-body.modulename=github.com/packruler/rewrite-body"
       - "--experimental.plugins.rewrite-body.version=v1.2.0"
       - "--experimental.plugins.cookiePathRewrite.modulename=github.com/vnghia/traefik-plugin-rewrite-cookie-path"
@@ -20,10 +20,10 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.constraints=Label(`project.name`, `netbird`)"
-      - "--entrypoints.unsecure.address=:80"
-      - "--entrypoints.default.forwardedheaders.trustedips=0.0.0.0/0"
-      - "--entryPoints.default.forwardedHeaders.insecure"
-      - "--entrypoints.default.address=:443"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.forwardedheaders.trustedips=0.0.0.0/0"
+      - "--entryPoints.websecure.forwardedHeaders.insecure"
+      - "--entrypoints.websecure.address=:443"
     restart: always
     networks:
       netbird: null
@@ -41,18 +41,18 @@ services:
     labels:
       project.name: 'netbird'
       traefik.enable: 'true'
-      traefik.http.routers.traefik-api-unsecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/traefik/dashboard`) || (PathPrefix(`/api`) && HeadersRegexp(`referer`, `/traefik/dashboard`)))'
-      traefik.http.routers.traefik-api-unsecure.entrypoints: "unsecure"
-      traefik.http.routers.traefik-api-unsecure.middlewares: "redirect-secure"
-      traefik.http.routers.traefik-api-unsecure.priority: 9000
-      traefik.http.routers.traefik-api.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/traefik/dashboard`) || (PathPrefix(`/api`) && HeadersRegexp(`referer`, `/traefik/dashboard`)))'
-      traefik.http.routers.traefik-api.priority: 9000
-      traefik.http.routers.traefik-api.entrypoints: "default"
-      traefik.http.routers.traefik-api.service: "api@internal"
-      traefik.http.routers.traefik-api.middlewares: "traefik-api-stripprefix,traefik-api-auth"
-      traefik.http.routers.traefik-api.tls: "true"
-      traefik.http.routers.traefik-api.tls.certresolver: "http"
-      traefik.http.routers.traefik-api.tls.domains[0].main: "${NETBIRD_DOMAIN}"
+      traefik.http.routers.traefik-api-web.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/traefik/dashboard`) || (PathPrefix(`/api`) && HeadersRegexp(`referer`, `/traefik/dashboard`)))'
+      traefik.http.routers.traefik-api-web.entrypoints: "web"
+      traefik.http.routers.traefik-api-web.middlewares: "redirect-secure"
+      traefik.http.routers.traefik-api-web.priority: 9000
+      traefik.http.routers.traefik-api-websecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/traefik/dashboard`) || (PathPrefix(`/api`) && HeadersRegexp(`referer`, `/traefik/dashboard`)))'
+      traefik.http.routers.traefik-api-websecure.priority: 9000
+      traefik.http.routers.traefik-api-websecure.entrypoints: "websecure"
+      traefik.http.routers.traefik-api-websecure.service: "api@internal"
+      traefik.http.routers.traefik-api-websecure.middlewares: "traefik-api-stripprefix,traefik-api-auth"
+      traefik.http.routers.traefik-api-websecure.tls: "true"
+      traefik.http.routers.traefik-api-websecure.tls.certresolver: "http"
+      traefik.http.routers.traefik-api-websecure.tls.domains[0].main: "${NETBIRD_DOMAIN}"
       traefik.http.middlewares.traefik-api-stripprefix.stripprefix.prefixes: "/traefik"
       traefik.http.middlewares.traefik-api-auth.basicauth.users: "admin:{SHA}0tTNr469Z7oY3fDRwNoUXE2vTBw="
       traefik.http.middlewares.redirect-secure.redirectregex.regex: "^(http|ws):\\/\\/(.+)$$"
@@ -70,17 +70,17 @@ services:
     labels:
       project.name: "netbird"
       traefik.enable: "true"
-      traefik.http.routers.dashboard-unsecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && PathPrefix(`/`)'
-      traefik.http.routers.dashboard-unsecure.entrypoints: "unsecure"
-      traefik.http.routers.dashboard-unsecure.middlewares: "redirect-secure"
-      traefik.http.routers.dashboard-unsecure.priority: 1000
-      traefik.http.routers.dashboard.rule: 'Host(`${NETBIRD_DOMAIN}`) && PathPrefix(`/`)'
-      traefik.http.routers.dashboard.priority: 1000
-      traefik.http.routers.dashboard.entrypoints: "default"
-      traefik.http.routers.dashboard.service: "dashboard"
-      traefik.http.routers.dashboard.tls: "true"
-      traefik.http.routers.dashboard.tls.certresolver: "http"
-      traefik.http.routers.dashboard.tls.domains[0].main: "${NETBIRD_DOMAIN}"
+      traefik.http.routers.dashboard-web.rule: 'Host(`${NETBIRD_DOMAIN}`) && PathPrefix(`/`)'
+      traefik.http.routers.dashboard-web.entrypoints: "web"
+      traefik.http.routers.dashboard-web.middlewares: "redirect-secure"
+      traefik.http.routers.dashboard-web.priority: 1000
+      traefik.http.routers.dashboard-websecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && PathPrefix(`/`)'
+      traefik.http.routers.dashboard-websecure.priority: 1000
+      traefik.http.routers.dashboard-websecure.entrypoints: "websecure"
+      traefik.http.routers.dashboard-websecure.service: "dashboard"
+      traefik.http.routers.dashboard-websecure.tls: "true"
+      traefik.http.routers.dashboard-websecure.tls.certresolver: "http"
+      traefik.http.routers.dashboard-websecure.tls.domains[0].main: "${NETBIRD_DOMAIN}"
       traefik.http.services.dashboard.loadbalancer.server.port: "80"
 
   # Signal
@@ -91,18 +91,18 @@ services:
     labels:
       project.name: "netbird"
       traefik.enable: "true"
-      traefik.http.routers.signal-unsecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/signalexchange`))'
-      traefik.http.routers.signal-unsecure.entrypoints: "unsecure"
-      traefik.http.routers.signal-unsecure.service: "signal-unsecure"
-      traefik.http.routers.signal-unsecure.priority: 4000
-      traefik.http.routers.signal.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/signalexchange`))'
-      traefik.http.routers.signal.priority: 4000
-      traefik.http.routers.signal.entrypoints: "default"
-      traefik.http.routers.signal.service: "signal"
-      traefik.http.routers.signal.tls: "true"
-      traefik.http.routers.signal.tls.certresolver: "http"
-      traefik.http.routers.signal.tls.domains[0].main: "${NETBIRD_DOMAIN}"
-      traefik.http.services.signal-unsecure.loadbalancer.server.port: "80"
+      traefik.http.routers.signal-web.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/signalexchange`))'
+      traefik.http.routers.signal-web.entrypoints: "web"
+      traefik.http.routers.signal-web.service: "signal-web"
+      traefik.http.routers.signal-web.priority: 4000
+      traefik.http.routers.signal-websecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/signalexchange`))'
+      traefik.http.routers.signal-websecure.priority: 4000
+      traefik.http.routers.signal-websecure.entrypoints: "websecure"
+      traefik.http.routers.signal-websecure.service: "signal"
+      traefik.http.routers.signal-websecure.tls: "true"
+      traefik.http.routers.signal-websecure.tls.certresolver: "http"
+      traefik.http.routers.signal-websecure.tls.domains[0].main: "${NETBIRD_DOMAIN}"
+      traefik.http.services.signal-web.loadbalancer.server.port: "80"
       traefik.http.services.signal.loadbalancer.server.scheme: "h2c"
       traefik.http.services.signal.loadbalancer.server.port: "10000"
 
@@ -114,17 +114,17 @@ services:
     labels:
       project.name: "netbird"
       traefik.enable: "true"
-      traefik.http.routers.relay-unsecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/relay`))'
-      traefik.http.routers.relay-unsecure.entrypoints: "unsecure"
-      traefik.http.routers.relay-unsecure.middlewares: "redirect-secure"
-      traefik.http.routers.relay-unsecure.priority: 4000
-      traefik.http.routers.relay.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/relay`))'
-      traefik.http.routers.relay.priority: 4000
-      traefik.http.routers.relay.entrypoints: "default"
-      traefik.http.routers.relay.service: "relay"
-      traefik.http.routers.relay.tls: "true"
-      traefik.http.routers.relay.tls.certresolver: "http"
-      traefik.http.routers.relay.tls.domains[0].main: "${NETBIRD_DOMAIN}"
+      traefik.http.routers.relay-web.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/relay`))'
+      traefik.http.routers.relay-web.entrypoints: "web"
+      traefik.http.routers.relay-web.middlewares: "redirect-secure"
+      traefik.http.routers.relay-web.priority: 4000
+      traefik.http.routers.relay-websecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/relay`))'
+      traefik.http.routers.relay-websecure.priority: 4000
+      traefik.http.routers.relay-websecure.entrypoints: "websecure"
+      traefik.http.routers.relay-websecure.service: "relay"
+      traefik.http.routers.relay-websecure.tls: "true"
+      traefik.http.routers.relay-websecure.tls.certresolver: "http"
+      traefik.http.routers.relay-websecure.tls.domains[0].main: "${NETBIRD_DOMAIN}"
       traefik.http.services.relay.loadbalancer.server.port: "80"
 
   # Management
@@ -144,17 +144,17 @@ services:
     labels:
       project.name: "netbird"
       traefik.enable: "true"
-      traefik.http.routers.management-unsecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/management.ManagementService`) || PathPrefix(`/api/`))'
-      traefik.http.routers.management-unsecure.entrypoints: "unsecure"
-      traefik.http.routers.management-unsecure.middlewares: "redirect-secure"
-      traefik.http.routers.management-unsecure.priority: 4000
-      traefik.http.routers.management.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/management.ManagementService`) || PathPrefix(`/api/`))'
-      traefik.http.routers.management.priority: 4000
-      traefik.http.routers.management.entrypoints: "default"
-      traefik.http.routers.management.service: "management"
-      traefik.http.routers.management.tls: "true"
-      traefik.http.routers.management.tls.certresolver: "http"
-      traefik.http.routers.management.tls.domains[0].main: "${NETBIRD_DOMAIN}"
+      traefik.http.routers.management-web.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/management.ManagementService`) || PathPrefix(`/api/`))'
+      traefik.http.routers.management-web.entrypoints: "web"
+      traefik.http.routers.management-web.middlewares: "redirect-secure"
+      traefik.http.routers.management-web.priority: 4000
+      traefik.http.routers.management-websecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/management.ManagementService`) || PathPrefix(`/api/`))'
+      traefik.http.routers.management-websecure.priority: 4000
+      traefik.http.routers.management-websecure.entrypoints: "websecure"
+      traefik.http.routers.management-websecure.service: "management"
+      traefik.http.routers.management-websecure.tls: "true"
+      traefik.http.routers.management-websecure.tls.certresolver: "http"
+      traefik.http.routers.management-websecure.tls.domains[0].main: "${NETBIRD_DOMAIN}"
       traefik.http.services.management.loadbalancer.server.scheme: "h2c"
       traefik.http.services.management.loadbalancer.server.port: "80"
       
@@ -167,17 +167,17 @@ services:
     labels:
       project.name: "netbird"
       traefik.enable: "true"
-      traefik.http.routers.zitadel-unsecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/zitadel`) || PathPrefix(`/device`) || PathPrefix(`/{path:(ui|.well-known|openapi|debug)}/`) || PathPrefix(`/{path:(admin|auth|management|system|assets|oidc|saml|oauth)/v[0-9]+/}`))'
-      traefik.http.routers.zitadel-unsecure.entrypoints: "unsecure"
-      traefik.http.routers.zitadel-unsecure.middlewares: "redirect-secure"
-      traefik.http.routers.zitadel-unsecure.priority: 5000
-      traefik.http.routers.zitadel.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/zitadel`) || PathPrefix(`/device`) || PathPrefix(`/{path:(ui|.well-known|openapi|debug)}/`) || PathPrefix(`/{path:(admin|auth|management|system|assets|oidc|saml|oauth)/v[0-9]+/}`))'
-      traefik.http.routers.zitadel.priority: 5000
-      traefik.http.routers.zitadel.entrypoints: "default"
-      traefik.http.routers.zitadel.service: "zitadel"
-      traefik.http.routers.zitadel.tls: "true"
-      traefik.http.routers.zitadel.tls.certresolver: "http"
-      traefik.http.routers.zitadel.tls.domains[0].main: "${NETBIRD_DOMAIN}"
+      traefik.http.routers.zitadel-web.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/zitadel`) || PathPrefix(`/device`) || PathPrefix(`/{path:(ui|.well-known|openapi|debug)}/`) || PathPrefix(`/{path:(admin|auth|management|system|assets|oidc|saml|oauth)/v[0-9]+/}`))'
+      traefik.http.routers.zitadel-web.entrypoints: "web"
+      traefik.http.routers.zitadel-web.middlewares: "redirect-secure"
+      traefik.http.routers.zitadel-web.priority: 5000
+      traefik.http.routers.zitadel-websecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/zitadel`) || PathPrefix(`/device`) || PathPrefix(`/{path:(ui|.well-known|openapi|debug)}/`) || PathPrefix(`/{path:(admin|auth|management|system|assets|oidc|saml|oauth)/v[0-9]+/}`))'
+      traefik.http.routers.zitadel-websecure.priority: 5000
+      traefik.http.routers.zitadel-websecure.entrypoints: "websecure"
+      traefik.http.routers.zitadel-websecure.service: "zitadel"
+      traefik.http.routers.zitadel-websecure.tls: "true"
+      traefik.http.routers.zitadel-websecure.tls.certresolver: "http"
+      traefik.http.routers.zitadel-websecure.tls.domains[0].main: "${NETBIRD_DOMAIN}"
       traefik.http.services.zitadel.loadbalancer.server.scheme: "h2c"
       traefik.http.services.zitadel.loadbalancer.server.port: "8080"
 
@@ -205,18 +205,18 @@ services:
     labels:
       project.name: "netbird"
       traefik.enable: "true"
-      traefik.http.routers.mail-unsecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/mail/`))'
-      traefik.http.routers.mail-unsecure.entrypoints: "unsecure"
-      traefik.http.routers.mail-unsecure.middlewares: "redirect-secure"
-      traefik.http.routers.mail-unsecure.priority: 6000
-      traefik.http.routers.mail.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/mail/`))'
-      traefik.http.routers.mail.priority: 6000
-      traefik.http.routers.mail.entrypoints: "default"
-      traefik.http.routers.mail.service: "mail"
-      traefik.http.routers.mail.middlewares: "mail-auth"
-      traefik.http.routers.mail.tls: "true"
-      traefik.http.routers.mail.tls.certresolver: "http"
-      traefik.http.routers.mail.tls.domains[0].main: "${NETBIRD_DOMAIN}"
+      traefik.http.routers.mail-web.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/mail/`))'
+      traefik.http.routers.mail-web.entrypoints: "web"
+      traefik.http.routers.mail-web.middlewares: "redirect-secure"
+      traefik.http.routers.mail-web.priority: 6000
+      traefik.http.routers.mail-websecure.rule: 'Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/mail/`))'
+      traefik.http.routers.mail-websecure.priority: 6000
+      traefik.http.routers.mail-websecure.entrypoints: "websecure"
+      traefik.http.routers.mail-websecure.service: "mail"
+      traefik.http.routers.mail-websecure.middlewares: "mail-auth"
+      traefik.http.routers.mail-websecure.tls: "true"
+      traefik.http.routers.mail-websecure.tls.certresolver: "http"
+      traefik.http.routers.mail-websecure.tls.domains[0].main: "${NETBIRD_DOMAIN}"
       traefik.http.services.mail.loadbalancer.server.port: "8025"
       traefik.http.middlewares.mail-auth.basicauth.users: "admin:{SHA}0tTNr469Z7oY3fDRwNoUXE2vTBw="
 
